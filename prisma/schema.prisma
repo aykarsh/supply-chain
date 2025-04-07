@@ -1,0 +1,231 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model for basic user information
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  orders        Order[]
+  products      Product[]
+  suppliers     Supplier[]
+  inventoryLogs InventoryLog[]
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  USER
+}
+
+// Product model
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  sku         String   @unique
+  price       Decimal  @db.Decimal(10, 2)
+  cost        Decimal  @db.Decimal(10, 2)
+  categoryId  String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String
+  
+  // Relations
+  category      Category       @relation(fields: [categoryId], references: [id])
+  createdBy     User           @relation(fields: [createdById], references: [id])
+  inventoryLogs InventoryLog[]
+  orderItems    OrderItem[]
+  inventory     Inventory?
+  suppliers     SupplierProduct[]
+}
+
+// Category model for product categorization
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relations
+  products    Product[]
+}
+
+// Inventory model to track stock levels
+model Inventory {
+  id          String   @id @default(cuid())
+  productId   String   @unique
+  quantity    Int      @default(0)
+  minQuantity Int      @default(10)
+  maxQuantity Int?
+  location    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  product     Product  @relation(fields: [productId], references: [id])
+}
+
+// InventoryLog model to track inventory changes
+model InventoryLog {
+  id          String         @id @default(cuid())
+  productId   String
+  quantity    Int
+  type        InventoryLogType
+  reason      String?
+  createdAt   DateTime       @default(now())
+  createdById String
+  
+  // Relations
+  product     Product        @relation(fields: [productId], references: [id])
+  createdBy   User           @relation(fields: [createdById], references: [id])
+}
+
+enum InventoryLogType {
+  ADDITION
+  REMOVAL
+  ADJUSTMENT
+  SALE
+  PURCHASE
+  RETURN
+}
+
+// Supplier model
+model Supplier {
+  id          String   @id @default(cuid())
+  name        String
+  email       String?
+  phone       String?
+  address     String?
+  contactName String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String
+  
+  // Relations
+  createdBy   User             @relation(fields: [createdById], references: [id])
+  products    SupplierProduct[]
+  orders      PurchaseOrder[]
+}
+
+// Junction table for many-to-many relationship between Supplier and Product
+model SupplierProduct {
+  id          String   @id @default(cuid())
+  supplierId  String
+  productId   String
+  cost        Decimal  @db.Decimal(10, 2)
+  leadTime    Int?     // in days
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  supplier    Supplier @relation(fields: [supplierId], references: [id])
+  product     Product  @relation(fields: [productId], references: [id])
+  
+  @@unique([supplierId, productId])
+}
+
+// Customer model
+model Customer {
+  id          String   @id @default(cuid())
+  name        String
+  email       String?  @unique
+  phone       String?
+  address     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  orders      Order[]
+}
+
+// Order model for customer orders
+model Order {
+  id          String      @id @default(cuid())
+  customerId  String
+  status      OrderStatus @default(PENDING)
+  totalAmount Decimal     @db.Decimal(10, 2)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  createdById String
+  
+  // Relations
+  customer    Customer    @relation(fields: [customerId], references: [id])
+  createdBy   User        @relation(fields: [createdById], references: [id])
+  items       OrderItem[]
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+// OrderItem model for items in an order
+model OrderItem {
+  id          String   @id @default(cuid())
+  orderId     String
+  productId   String
+  quantity    Int
+  unitPrice   Decimal  @db.Decimal(10, 2)
+  createdAt   DateTime @default(now())
+  
+  // Relations
+  order       Order    @relation(fields: [orderId], references: [id])
+  product     Product  @relation(fields: [productId], references: [id])
+}
+
+// PurchaseOrder model for ordering from suppliers
+model PurchaseOrder {
+  id          String              @id @default(cuid())
+  supplierId  String
+  status      PurchaseOrderStatus @default(DRAFT)
+  totalAmount Decimal             @db.Decimal(10, 2)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  
+  // Relations
+  supplier    Supplier            @relation(fields: [supplierId], references: [id])
+  items       PurchaseOrderItem[]
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  RECEIVED
+  CANCELLED
+}
+
+// PurchaseOrderItem model for items in a purchase order
+model PurchaseOrderItem {
+  id              String   @id @default(cuid())
+  purchaseOrderId String
+  productId       String
+  quantity        Int
+  unitCost        Decimal  @db.Decimal(10, 2)
+  createdAt       DateTime @default(now())
+  
+  // Relations
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+}
