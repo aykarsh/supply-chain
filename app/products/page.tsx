@@ -6,8 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { MainLayout } from '@/components/layout/main-layout';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function ProductsPage() {
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
   const [searchInput, setSearchInput] = useState('');
   
@@ -33,7 +36,9 @@ export default function ProductsPage() {
           />
           <Button type="submit">Search</Button>
         </form>
-        <Button href="/products/add">Add Product</Button>
+        <Button asChild>
+          <Link href="/products/add">Add Product</Link>
+        </Button>
       </div>
 
       {loading ? (
@@ -73,12 +78,12 @@ export default function ProductsPage() {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Category:</span>
-                        <span>{product.category.name}</span>
+                        <span>{product.category?.name || 'Uncategorized'}</span>
                       </div>
                       <Button 
                         variant="outline" 
                         className="w-full mt-4"
-                        href={`/products/${product.id}`}
+                        onClick={() => router.push(`/products/${product.id}`)}
                       >
                         View Details
                       </Button>

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -103,7 +102,7 @@ export async function POST(request: NextRequest) {
         
         // Create the category with the same ID as provided
         const categoryName = {
-          'electronics': 'Electronics',
+          ['electronics']: 'Electronics',
           'accessories': 'Accessories',
           'home-office': 'Home Office',
           'clothing': 'Clothing'

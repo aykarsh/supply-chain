@@ -5,91 +5,97 @@ import { useState, useEffect } from 'react';
 interface Product {
   id: string;
   name: string;
-  description: string | null;
   sku: string;
   price: number;
   cost: number;
-  categoryId: string;
+  description: string | null;
   category: {
     id: string;
     name: string;
   };
-  inventory: {
+  inventory?: {
     quantity: number;
     minQuantity: number;
-    maxQuantity: number | null;
-    location: string | null;
-  } | null;
+  };
+  createdAt: string;
+  updatedAt: string;
 }
 
-interface PaginationData {
+interface Pagination {
   total: number;
   page: number;
   limit: number;
   pages: number;
 }
 
-interface UseProductsProps {
-  initialPage?: number;
-  limit?: number;
+interface UseProductsOptions {
   search?: string;
   category?: string;
+  page?: number;
+  limit?: number;
 }
 
-export function useProducts({
-  initialPage = 1,
-  limit = 10,
-  search = '',
-  category = '',
-}: UseProductsProps = {}) {
+export function useProducts(options: UseProductsOptions = {}) {
   const [products, setProducts] = useState<Product[]>([]);
-  const [pagination, setPagination] = useState<PaginationData>({
+  const [pagination, setPagination] = useState<Pagination>({
     total: 0,
-    page: initialPage,
-    limit,
-    pages: 0,
+    page: 1,
+    limit: 10,
+    pages: 1,
   });
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Error | null>(null);
 
-  const fetchProducts = async (page = pagination.page) => {
+  const fetchProducts = async (params: UseProductsOptions) => {
     setLoading(true);
     setError(null);
-    
+
     try {
-      const queryParams = new URLSearchParams({
-        page: page.toString(),
-        limit: limit.toString(),
-        ...(search ? { search } : {}),
-        ...(category ? { category } : {}),
-      });
-      
+      // Build query string
+      const queryParams = new URLSearchParams();
+      if (params.search) queryParams.append('search', params.search);
+      if (params.category) queryParams.append('category', params.category);
+      if (params.page) queryParams.append('page', params.page.toString());
+      if (params.limit) queryParams.append('limit', params.limit.toString());
+
       const response = await fetch(`/api/products?${queryParams.toString()}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch products');
       }
-      
+
       const data = await response.json();
-      setProducts(data.products);
-      setPagination(data.pagination);
+      setProducts(data.products || []);
+      setPagination(data.pagination || {
+        total: 0,
+        page: 1,
+        limit: params.limit || 10,
+        pages: 1,
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      console.error('Error fetching products:', err);
+      setError(err instanceof Error ? err : new Error('Unknown error'));
+      setProducts([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const changePage = (newPage: number) => {
-    if (newPage > 0 && newPage <= pagination.pages) {
-      setPagination(prev => ({ ...prev, page: newPage }));
-      fetchProducts(newPage);
-    }
-  };
-
   useEffect(() => {
-    fetchProducts(initialPage);
-  }, [search, category, limit, initialPage]);
+    fetchProducts({
+      search: options.search,
+      category: options.category,
+      page: options.page || 1,
+      limit: options.limit || 10,
+    });
+  }, [options.search, options.category, options.page, options.limit]);
+
+  const changePage = (newPage: number) => {
+    fetchProducts({
+      ...options,
+      page: newPage,
+    });
+  };
 
   return {
     products,
@@ -97,6 +103,6 @@ export function useProducts({
     loading,
     error,
     changePage,
-    refetch: fetchProducts,
+    refresh: () => fetchProducts(options),
   };
 }
